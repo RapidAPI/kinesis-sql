@@ -188,7 +188,10 @@ private[kinesis] case class KinesisReader(
       returnedToken = listShardsResult.getNextToken()
       if (returnedToken != null) {
         nextToken = returnedToken
+        // Requests cannot contain both a stream name and a token
+        listShardsRequest = new ListShardsRequest
         listShardsRequest.setNextToken(nextToken)
+        listShardsRequest.setMaxResults(maxSupportedShardsPerStream)
       }
     } while (!nextToken.isEmpty)
 
