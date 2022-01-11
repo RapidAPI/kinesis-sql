@@ -8,7 +8,9 @@ import org.apache.commons.logging.LogFactory;
 
 public class AWSInstanceProfileCredentialsProviderWithRetries
         extends InstanceProfileCredentialsProvider {
-
+    AWSInstanceProfileCredentialsProviderWithRetries() {
+        super(true);
+    }
     private static final Log LOG =
             LogFactory.getLog(AWSInstanceProfileCredentialsProviderWithRetries.class);
 

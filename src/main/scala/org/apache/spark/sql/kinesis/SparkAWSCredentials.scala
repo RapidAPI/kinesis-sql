@@ -17,7 +17,7 @@
 package org.apache.spark.sql.kinesis
 
 import com.amazonaws.auth._
-
+import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClientBuilder
 import org.apache.spark.annotation.Evolving
 import org.apache.spark.internal.Logging
 
@@ -92,21 +92,17 @@ private[kinesis] final case class STSCredentials(
     stsSessionName: String,
     stsExternalId: Option[String] = None,
     longLivedCreds: SparkAWSCredentials = DefaultCredentials)
-  extends SparkAWSCredentials  {
+  extends SparkAWSCredentials {
 
   def provider: AWSCredentialsProvider = {
-    val builder = new STSAssumeRoleSessionCredentialsProvider.Builder(stsRoleArn, stsSessionName)
-      .withLongLivedCredentialsProvider(longLivedCreds.provider)
-    stsExternalId match {
-      case Some(stsExternalId) =>
-        builder.withExternalId(stsExternalId)
-          .build()
-      case None =>
-        builder.build()
-    }
+    new STSAssumeRoleSessionCredentialsProvider.Builder(stsRoleArn, stsSessionName)
+      .withStsClient(AWSSecurityTokenServiceClientBuilder
+        .standard()
+        .withCredentials(longLivedCreds.provider)
+        .build())
+      .build()
   }
 }
-
 @Evolving
 object SparkAWSCredentials {
 

@@ -17,16 +17,15 @@
 package org.apache.spark.sql.kinesis
 
 import java.nio.ByteBuffer
-
 import scala.util.Try
-
 import com.amazonaws.services.kinesis.producer.{KinesisProducer, UserRecordResult}
-import com.google.common.util.concurrent.{FutureCallback, Futures}
-
+import com.google.common.util.concurrent.{FutureCallback, Futures, MoreExecutors}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Cast, UnsafeProjection}
 import org.apache.spark.sql.types.{BinaryType, StringType}
+
+import java.util.concurrent.{Executor, Executors, ThreadPoolExecutor}
 
 private[kinesis] class KinesisWriteTask(producerConfiguration: Map[String, String],
                                         inputSchema: Seq[Attribute]) extends Logging {
@@ -72,7 +71,6 @@ private[kinesis] class KinesisWriteTask(producerConfiguration: Map[String, Strin
       }
 
       override def onSuccess(result: UserRecordResult): Unit = {
-        val shardId = result.getShardId
         sentSeqNumbers = result.getSequenceNumber
       }
     }

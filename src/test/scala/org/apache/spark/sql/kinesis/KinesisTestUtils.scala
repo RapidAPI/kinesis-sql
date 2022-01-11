@@ -19,23 +19,22 @@ package org.apache.spark.sql.kinesis
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.TimeUnit
-
+import java.util.concurrent.{Executors, TimeUnit}
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Random, Success, Try}
-
 import com.amazonaws.auth.{AWSCredentials, DefaultAWSCredentialsProviderChain}
+import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.amazonaws.regions.RegionUtils
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient
 import com.amazonaws.services.dynamodbv2.document.DynamoDB
 import com.amazonaws.services.kinesis.{AmazonKinesis, AmazonKinesisClient}
 import com.amazonaws.services.kinesis.model._
-import com.amazonaws.services.kinesis.producer.{KinesisProducer => KPLProducer, KinesisProducerConfiguration, UserRecordResult}
+import com.amazonaws.services.kinesis.producer.{KinesisProducerConfiguration, UserRecordResult, KinesisProducer => KPLProducer}
 import com.google.common.util.concurrent.{FutureCallback, Futures}
-
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.kinesis.KinesisTestUtils.getRegionNameByEndpoint
 
 private[kinesis] class KinesisTestUtils(streamShardCount: Int = 2) extends Logging {
 
@@ -52,8 +51,13 @@ private[kinesis] class KinesisTestUtils(streamShardCount: Int = 2) extends Loggi
   private var _streamName: String = _
 
   protected lazy val kinesisClient = {
-    val client = new AmazonKinesisClient(KinesisTestUtils.getAWSCredentials())
-    client.setEndpoint(endpointUrl)
+    val client = AmazonKinesisClient
+      .builder()
+      .withCredentials(new DefaultAWSCredentialsProviderChain())
+      .withEndpointConfiguration(
+        new EndpointConfiguration(endpointUrl, regionName)
+      )
+      .build()
     client
   }
 
@@ -300,7 +304,7 @@ private[kinesis] trait KinesisDataGenerator {
 }
 
 private[kinesis] class SimpleDataGenerator(
-    client: AmazonKinesisClient) extends KinesisDataGenerator {
+    client: AmazonKinesis) extends KinesisDataGenerator {
   override def sendData(streamName: String, data: Array[String]):
   Map[String, Seq[(String, String)]] = {
     val shardIdToSeqNumbers =
@@ -366,7 +370,7 @@ private[kinesis] class KPLDataGenerator(regionName: String) extends KinesisDataG
           sentSeqNumbers += ((num, seqNumber))
         }
       }
-      Futures.addCallback(future, kinesisCallBack)
+      Futures.addCallback(future, kinesisCallBack, Executors.newWorkStealingPool())
     }
     producer.flushSync()
     shardIdToSeqNumbers.toMap
